@@ -1,0 +1,4 @@
+# dsh-session-archive 配置包补丁：在空配置根上追加插件行。
+- insert:
+    - id: session-archive
+      name: 'dsh-session-archive'

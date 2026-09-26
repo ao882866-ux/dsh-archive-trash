@@ -1,0 +1,53 @@
+{
+  "name": "dsh-session-archive",
+  "version": "0.1.0",
+  "description": "DeepSeek Harness plugin: permanently delete archived sessions from the sidebar session row",
+  "type": "module",
+  "main": "lib/index.js",
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "plugin",
+    "archive",
+    "session"
+  ],
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "default": "./lib/client.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "node client-src/build.mjs",
+    "test": "vitest run",
+    "check": "node tests/bundle-check.mjs"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.2"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "jsdom": "^30.1.1",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "vitest": "^3.0.0"
+  },
+  "license": "MIT"
+}
