@@ -40,27 +40,50 @@ DSH 自带「归档」与「取消归档」，但归档后的会话长期积累�
 ## 安装
 
 本插件是标准的 DSH profile 插件包。把它放进 profile 的 `node_modules`，
-并在 profile 的 `package.json` 里注册：
+并在 profile 的 `package.json` 里注册。
+
+### 1. 克隆并构建客户端 bundle
 
 ```bash
-# 1. 克隆并构建客户端 bundle
 git clone https://github.com/ao882866-ux/dsh-session-archive.git
 cd dsh-session-archive
 npm install
 npm run build
+```
 
-# 2. 放进 profile 的 node_modules
+### 2. 复制进 profile 的 `node_modules`
+
+**Windows（PowerShell）** —— DSH 桌面端默认在 Windows 上运行：
+
+```powershell
+$dst = "$env:USERPROFILE\.dsh\profiles\desktop\node_modules\dsh-session-archive"
+New-Item -ItemType Directory -Path "$dst\lib" -Force
+Copy-Item lib\*.js "$dst\lib\" -Force
+Copy-Item package.json, cordis.patch.yml, README.md, LICENSE $dst -Force
+```
+
+**macOS / Linux：**
+
+```bash
 cp -r lib package.json cordis.patch.yml \
   "$DSH_HOME/profiles/desktop/node_modules/dsh-session-archive/"
 ```
 
-然后在 `$DSH_HOME/profiles/desktop/package.json` 里把包名加进
-`dsh.profile.bundles`（本包自带 `cordis.patch.yml`，bundles 机制会在启动时
-自动把它叠进 patch 栈）：
+> 不确定 profile 路径时：默认是 `~/.dsh/profiles/desktop`（可用环境变量
+> `DSH_HOME` 覆盖）。若你用的是别的 profile，把 `desktop` 换成对应的名字。
+
+### 3. 注册进 `dsh.profile.bundles`
+
+编辑 `<profile>/package.json`，把包名加进 `dsh.profile.bundles`
+（本包自带 `cordis.patch.yml`，bundles 机制会在启动时自动把它叠进 patch 栈）：
 
 ```json
 "bundles": [ "...", "dsh-session-archive" ]
 ```
+
+### 4. 重启 DSH
+
+见下节 —— 这一步**不能省**。
 
 ### ⚠️ 必须**重启 DSH**，热重载不够
 
