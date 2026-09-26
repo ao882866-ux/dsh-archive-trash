@@ -44,7 +44,7 @@ DSH 自带「归档」与「取消归档」，但归档后的会话长期积累�
 
 ```bash
 # 1. 克隆并构建客户端 bundle
-git clone https://github.com/<你的用户名>/dsh-session-archive.git
+git clone https://github.com/ao882866-ux/dsh-session-archive.git
 cd dsh-session-archive
 npm install
 npm run build
