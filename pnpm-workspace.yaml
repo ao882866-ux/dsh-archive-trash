@@ -1,0 +1,12 @@
+# pnpm 设置（pnpm 11 起设置项已从 package.json 的 "pnpm" 字段迁移到这里）
+#
+# ⚠️ 为什么必须有这个文件：
+#   esbuild 装完要跑 postinstall 去落地平台二进制。pnpm 10+ 默认**拦截**所有
+#   依赖的构建脚本，于是 `pnpm install` 会以 **exit 1** 结束（ERR_PNPM_IGNORED_BUILDS），
+#   并且随后的 `pnpm build` / `pnpm test` 也会因为依赖状态检查失败而报错。
+#   显式放行 esbuild 后安装即恢复正常。
+#
+# 该配置由 `pnpm approve-builds --all` 生成；手动写上效果相同。
+# npm 不需要这个文件（它只警告，不阻塞）。
+allowBuilds:
+  esbuild: true

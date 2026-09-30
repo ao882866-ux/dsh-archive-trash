@@ -42,13 +42,13 @@ DSH 自带「归档」与「取消归档」，但归档后的会话长期积累�
 本插件是标准的 DSH profile 插件包。把它放进 profile 的 `node_modules`，
 并在 profile 的 `package.json` 里注册。
 
-### 1. 克隆并构建客户端 bundle
+> **不需要 npm / pnpm，也不需要构建** —— 仓库的 `lib/` 里已经带了构建好的
+> 客户端 bundle，克隆下来直接复制即可。
+
+### 1. 克隆
 
 ```bash
 git clone https://github.com/ao882866-ux/dsh-session-archive.git
-cd dsh-session-archive
-npm install
-npm run build
 ```
 
 ### 2. 复制进 profile 的 `node_modules`
@@ -65,12 +65,14 @@ Copy-Item package.json, cordis.patch.yml, README.md, LICENSE $dst -Force
 **macOS / Linux：**
 
 ```bash
+mkdir -p "$DSH_HOME/profiles/desktop/node_modules/dsh-session-archive"
 cp -r lib package.json cordis.patch.yml \
   "$DSH_HOME/profiles/desktop/node_modules/dsh-session-archive/"
 ```
 
 > 不确定 profile 路径时：默认是 `~/.dsh/profiles/desktop`（可用环境变量
 > `DSH_HOME` 覆盖）。若你用的是别的 profile，把 `desktop` 换成对应的名字。
+> 在仓库目录里执行上面的命令即可。
 
 ### 3. 注册进 `dsh.profile.bundles`
 
@@ -183,11 +185,30 @@ external（宿主 shell 提供单例；打进来会产生第二个 React 实例�
 | `archive.delete` | **永久删除**（单条） |
 | `archive.deleteMany` | **永久删除**（批量） |
 
+## 开发（改源码才需要）
+
+普通安装**不需要**这一步 —— 见上文，`lib/` 已带构建产物。只有你要改
+`client-src/` 或 `lib/index.js` 时才需要：
+
+```bash
+pnpm install          # 或 npm install
+pnpm build            # 重新生成 lib/client.js
+```
+
+> ⚠️ **pnpm 10+ 会拦截依赖的构建脚本**，若不处理，`pnpm install` 会以
+> **exit 1** 结束（`ERR_PNPM_IGNORED_BUILDS`），随后 `pnpm build` / `pnpm test`
+> 也会因依赖状态检查失败而报错。esbuild 必须跑 postinstall 才能落地平台二进制。
+>
+> 仓库已带 `pnpm-workspace.yaml` 显式放行 esbuild，正常克隆下来即可直接安装。
+> 若你的环境仍提示，执行一次 `pnpm approve-builds --all` 即可。
+>
+> 用 npm 不会阻塞（只警告）。
+
 ## 测试
 
 ```bash
-npm test        # 84 个单测
-npm run check   # bundle 契约检查（21 项）
+pnpm test     # 84 个单测
+pnpm check    # bundle 契约检查（21 项）
 ```
 
 覆盖四类：
