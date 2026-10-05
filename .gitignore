@@ -5,13 +5,6 @@ node_modules/
 .scratch/
 *.log
 
-# 推广素材：只保留在本地，不进仓库
-docs/promo-video.html
-docs/promo-video.mp4
-docs/douyin-video-script.md
-.record-tmp/
-.verify-tmp/
-
 # 编辑器 / 系统
 .DS_Store
 Thumbs.db

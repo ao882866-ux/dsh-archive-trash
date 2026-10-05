@@ -1,6 +1,5 @@
 # dsh-session-archive
 
-[![test](https://img.shields.io/badge/tests-84%20passing-brightgreen)](#测试)
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 **DeepSeek Harness 插件：在侧栏会话行上永久删除已归档会话。**
@@ -122,6 +121,52 @@ DSH **没有**会话删除 API：
 | 工作区归属 | `Workspace.detachSession(sessionId)` |
 | 归档集合 | `workspaceRegistry.unarchiveSession(sessionId)` |
 
+此外还要把**活着的会话**从内存摘除（`ctx.sessions`），否则
+`sessionQuery.listSessions()` 仍会把它列出来 —— 详见下文「删除顺序」。
+
+## 删除顺序（曾经写反，导致「删了又回到未归档列表」）
+
+⚠️ **这是本插件修过的最严重的缺陷**，症状是：点击删除归档会话后，它**又出现
+在未归档列表里**，而且此后再也删不掉。
+
+根因是删除顺序反了。旧实现是「**先摘归档标记、再删文件**」，而侧栏的可见性判据是
+
+```js
+// dsh-client-ui-workspace 的 sessionVisible()，archivedFilter === 'default'
+return !archived.has(session.id)
+```
+
+也就是说 **「取消归档」恰恰会让这一行变得可见**。于是只要删文件失败
+（文件被占用 / `EPERM` / 瞬时 I/O），结果就是「会话还在磁盘上、但已经不再归档」
+—— DSH 于是把它当作一个**普通会话**列出来。更糟的是此后宿主会以
+「不在归档集合中」拒绝再次删除，这条会话就既删不掉、又一直占着列表。
+
+现在正确的顺序是：
+
+1. **先把活着的会话从 `ctx.sessions` 摘除**（`liveEntryFor` + `detachEntered`）。
+   摘除会触发 `session/disposed` → 持久化写入句柄 `close()`（释放单写者租约，
+   避免删完之后后台 append 又把日志文件建出来），并让客户端丢弃该行。
+   必须在删文件**之前**，否则后台写入可能重建日志。
+2. **删日志目录并复核删净**（`removeTree`：删完检查存在性，仍在则重试）。
+   同名会话在多个 bucket 下都有目录时**全部删除**。
+3. **删投影缓存**（失败不算致命 —— 它不是会话本体）。
+4. **到这里才摘归档标记**（`unarchiveSession`）。
+5. **从工作区摘除归属**（`detachSession`）。
+
+这个顺序保证了**失败方向永远是安全的**：
+
+| 失败位置 | 结果 | 用户感受 |
+|---|---|---|
+| 第 1~3 步 | 会话**原样还在、仍然归档** | 「删除失败，可重试」，会话仍在归档列表里 |
+| 第 4 步 | 文件已删净、归档集合还留着（幽灵条目） | 本插件**仍然允许删除**这种条目，可清理 |
+
+无论走哪条失败路径，都**绝不会**留下「不再归档、却还在磁盘上」的会话 ——
+那正是用户看到「回到未归档列表」的形态。
+
+客户端侧配套：删除成功后调用 `ctx.sessions.refresh()` 重新拉取列表基线。
+宿主摘除活动会话会转发 `api-session/removed`，但会话在删除前若已不在内存中
+（进程重启后从未打开过），就不会有这个事件，只能靠主动刷新兜底。
+
 ## 安全约定（真实风险）
 
 **删除是不可恢复的**（`deleteSession` 直接 `fs.rm`），故宿主侧有四道闸门
@@ -134,16 +179,15 @@ DSH **没有**会话删除 API：
 2. **id 必须先通过形态校验**（`isPlausibleSessionId`）。id 会被拼进文件路径，
    放行 `../` 等于任意文件删除。该校验拒绝路径分隔符、`..` 与非
    `session-<uuid>` / 裸 uuid 的形态。
-3. **先摘除归档标记与工作区归属，再删文件**。这样失败方向是「会话还在、
-   只是被取消归档」—— 用户可重试；反过来则是「文件没了但归档集合还留着」，
-   界面会出现幽灵条目。
+3. **先删净文件，最后才摘归档标记与工作区归属**。见上文「删除顺序」——
+   失败方向必须是「会话原样还在、仍然归档」，绝不能是「不再归档、却还在磁盘上」。
 4. **正在运行的会话拒绝删除**。DSH 的写路径持有单写者句柄，日志被抽走会让
    下一次 append 失败，表现为会话无故损坏。
 
 客户端另有**两段式确认**（点一次只上膛、图标变红，再点才执行；失焦或 5 秒
 自动取消）—— 不可逆操作绝不能一击执行。
 
-删除操作会写 `warn` 级日志（含会话 id），便于事后追溯。
+删除成功写 `warn` 级日志、失败写 `error` 级日志（都含会话 id），便于事后追溯。
 
 ### 日志目录已缺失的条目仍可删除
 
@@ -158,7 +202,6 @@ lib/pure.js      纯函数：排序 / 检索 / 可删除性判定 / 工作区解
 lib/index.js     宿主：RPC 处理器 + HTTP 端点注册 + 文件系统操作
 lib/client.js    客户端 bundle（由 client-src/ 经 esbuild 打包）
 client-src/      UI 源码（React.createElement，不用 JSX）
-tests/           84 个单测 + bundle 契约检查
 ```
 
 客户端 bundle 的产物形态必须符合 DSH 客户端模块加载器契约：
@@ -196,44 +239,13 @@ pnpm build            # 重新生成 lib/client.js
 ```
 
 > ⚠️ **pnpm 10+ 会拦截依赖的构建脚本**，若不处理，`pnpm install` 会以
-> **exit 1** 结束（`ERR_PNPM_IGNORED_BUILDS`），随后 `pnpm build` / `pnpm test`
+> **exit 1** 结束（`ERR_PNPM_IGNORED_BUILDS`），随后 `pnpm build`
 > 也会因依赖状态检查失败而报错。esbuild 必须跑 postinstall 才能落地平台二进制。
 >
 > 仓库已带 `pnpm-workspace.yaml` 显式放行 esbuild，正常克隆下来即可直接安装。
 > 若你的环境仍提示，执行一次 `pnpm approve-builds --all` 即可。
 >
 > 用 npm 不会阻塞（只警告）。
-
-## 测试
-
-```bash
-pnpm test     # 84 个单测
-pnpm check    # bundle 契约检查（21 项）
-```
-
-覆盖四类：
-
-- `tests/pure.spec.js` —— 排序、检索、可删除性、工作区解析；
-- `tests/rpc.spec.js` —— RPC 处理器，含**安全边界**：拒绝未归档会话、
-  拒绝路径穿越、拒绝运行中会话、日志缺失仍可删、永久删除后无残留；
-- `tests/endpoint.spec.js` —— HTTP 网关契约：路由注册、405/415/400、
-  报文形状校验、rpcId 回显；
-- `tests/delete-button.spec.js` —— 会话行按钮：仅对归档会话渲染、两段式确认、
-  图标渲染尺寸、对齐契约。
-
-删除相关用例全部在**一次性临时 `DSH_HOME`** 下运行，绝不触碰真实 `~/.dsh`。
-
-端到端验证「删除后无残留副本」（同样只动临时目录）：
-
-```bash
-node tests/verify-permanent-delete.mjs
-```
-
-只读检查真实环境的归档现状（零副作用，只调 `archive.list`）：
-
-```bash
-node tests/live-readonly-check.mjs
-```
 
 ## 已知限制
 
@@ -245,6 +257,11 @@ node tests/live-readonly-check.mjs
 - **工作区归属**优先按 sessionId 解析（会话可被移动），退回按 cwd 匹配
   （大小写不敏感 —— Windows 路径大小写不敏感）。
 - **删除不可恢复**，没有回收站。这是刻意的设计选择，见上文「安全约定」。
+- **删除失败时不会留下「未归档但仍在磁盘」的会话**：这是硬保证，不是尽力而为。
+  删文件失败 → 会话原样保持归档；只有摘标记失败 → 留下可再次删除的幽灵条目。
+- **同名会话在多个 bucket 下都有目录**时会全部删除；目录若在删除后被后台写入
+  重建，`removeTree` 会重试至多 5 次（每次退避 60ms），仍失败则整体报失败并
+  保持归档状态。
 
 ## License
 

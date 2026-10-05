@@ -130,8 +130,9 @@ const S = {
  * @param props.sessionId - 本行对应的会话 id（slot 注入）。
  * @param props.rpcCall - 宿主端点调用函数（slot 注入）。
  * @param props.archivedSetSnapshot - 返回当前已归档 id 集合的函数（slot 注入）。
+ * @param props.refreshSessionList - 删除成功后刷新会话列表基线的函数（slot 注入）。
  */
-export function DeleteArchivedSessionButton({ sessionId, rpcCall, archivedSetSnapshot }) {
+export function DeleteArchivedSessionButton({ sessionId, rpcCall, archivedSetSnapshot, refreshSessionList }) {
   const [armed, setArmed] = React.useState(false)
   const [busy, setBusy] = React.useState(false)
   const [failed, setFailed] = React.useState(false)
@@ -165,13 +166,28 @@ export function DeleteArchivedSessionButton({ sessionId, rpcCall, archivedSetSna
     setBusy(true)
     try {
       await rpcCall('archive.delete', { sessionId })
-      // 成功后宿主已把该会话移出归档集合，行会随快照更新消失；
-      // 这里不再 setState，避免对已卸载组件写状态。
     } catch {
       if (mounted.current) {
         setArmed(false)
         setFailed(true)
       }
+      if (mounted.current) setBusy(false)
+      return
+    }
+
+    // ⚠️ 成功后**必须**刷新列表基线。
+    // 侧栏可见性判据是 `!archived.has(id)`（archivedFilter==='default'），
+    // 所以宿主把该会话移出归档集合之后，这一行反而会**变得可见**。
+    // 不同步列表的话，它就以「未归档会话」的身份留在侧栏 —— 用户看到的
+    // 就是「点击删除后它又进入未归档列表」。
+    //
+    // 刻意放在 `catch` **之外**：数据已经删掉了，刷新只是界面同步，
+    // 它失败绝不能被报成「删除失败」（那会诱导用户去重试一个已删的会话）。
+    // 行随列表更新消失，故这里不再 setState（避免对已卸载组件写状态）。
+    try {
+      refreshSessionList?.()
+    } catch {
+      // 界面同步失败不影响删除结果。
     } finally {
       if (mounted.current) setBusy(false)
     }

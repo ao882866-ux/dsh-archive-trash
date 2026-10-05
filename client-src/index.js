@@ -64,11 +64,38 @@ export function apply(ctx) {
     return new Set(Array.isArray(ids) ? ids : [])
   }
 
+  /**
+   * 重新拉取会话列表基线。
+   *
+   * ⚠️ **删除成功后必须调用**，否则那一行不会消失。原因是侧栏可见性由
+   * `sessionVisible(session, current, archived, archivedFilter)` 决定：
+   * `archivedFilter === 'default'` 时它返回 `!archived.has(session.id)` ——
+   * 也就是说**「取消归档」恰恰会让这一行变得可见**。宿主删除时会把该会话移出
+   * 归档集合，若列表基线不同步，这一行就会以「未归档会话」的身份留在侧栏里
+   * —— 正是用户报的「点击删除后它又进入未归档列表」。
+   *
+   * 宿主侧摘除活动会话会转发 `api-session/removed`，正常情况下客户端会自行
+   * 丢弃该行；但会话在删除前若已不在内存中（进程重启后从未打开过），就不会有
+   * 这个事件，只能靠主动刷新基线兜底。故两条路径都保留。
+   *
+   * 刷新失败不影响删除结果（数据已经删掉了），故只吞掉错误。
+   */
+  function refreshSessionList() {
+    const sessions = ctx.get?.('sessions')
+    try {
+      // `refresh()` 返回 Promise；吞掉它的 rejection，避免未处理的拒绝。
+      const pending = sessions?.refresh?.()
+      if (pending !== undefined && typeof pending.then === 'function') pending.then(undefined, () => {})
+    } catch {
+      // 刷新只是界面同步，失败不该让「已删除」被报成失败。
+    }
+  }
+
   ctx.slots.inject('sidebar.workspaces.session.row.action', () => ctx.slots.register({
     name: 'sidebar.workspaces.session.row.action',
     id: 'session-archive-delete',
     // 排在 DSH 自带的 archive(100) 与 pin(200) 之后。
     order: 300,
-    inject: () => ({ rpcCall, archivedSetSnapshot }),
+    inject: () => ({ rpcCall, archivedSetSnapshot, refreshSessionList }),
   }, DeleteArchivedSessionButton))
 }
