@@ -1,4 +1,4 @@
-# dsh-session-archive
+# dsh-archive-trash
 
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
@@ -43,7 +43,7 @@ DSH 自带「归档」与「取消归档」，但归档后的会话长期积累�
 打开 **设置 → 插件 → 添加插件**，在「包名或地址」里填入本仓库地址：
 
 ```
-https://github.com/ao882866-ux/dsh-session-archive
+https://github.com/ao882866-ux/dsh-archive-trash
 ```
 
 安装完成后按提示重启 DSH。
@@ -52,15 +52,15 @@ https://github.com/ao882866-ux/dsh-session-archive
 
 ```bash
 # 命令行（桌面端的 desktop profile 由应用独占，CLI 会拒绝写入）
-dsh plugin --profile <profile> add github:ao882866-ux/dsh-session-archive
+dsh plugin --profile <profile> add github:ao882866-ux/dsh-archive-trash
 ```
 
 手动复制：把 `lib/` 与 `package.json`、`cordis.patch.yml` 放进
-`<profile>/node_modules/dsh-session-archive/`，再把包名加进 profile
+`<profile>/node_modules/dsh-archive-trash/`，再把包名加进 profile
 `package.json` 的 `dsh.profile.bundles`：
 
 ```json
-"bundles": [ "...", "dsh-session-archive" ]
+"bundles": [ "...", "dsh-archive-trash" ]
 ```
 
 > profile 默认在 `~/.dsh/profiles/desktop`（可用 `DSH_HOME` 覆盖）。
@@ -285,7 +285,7 @@ client-src/      UI 源码（React.createElement，不用 JSX）
 window.__ModuleLoader__.load({ id: '<包名>', factory: (require) => { ... } })
 ```
 
-`id` 必须是**包名**（`dsh-session-archive`），`react` / `react-dom` 必须保持
+`id` 必须是**包名**（`dsh-archive-trash`），`react` / `react-dom` 必须保持
 external（宿主 shell 提供单例；打进来会产生第二个 React 实例，hooks 直接报错）。
 
 宿主侧 `inject = []`，`connection` 通过 `ctx.inject(['connection'], ...)`

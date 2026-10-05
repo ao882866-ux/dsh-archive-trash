@@ -1,5 +1,5 @@
 {
-  "name": "dsh-session-archive",
+  "name": "dsh-archive-trash",
   "version": "0.1.0",
   "description": "DeepSeek Harness plugin: permanently delete archived sessions from the sidebar session row",
   "type": "module",

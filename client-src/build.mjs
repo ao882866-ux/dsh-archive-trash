@@ -7,7 +7,7 @@
  * window.__ModuleLoader__.load({ id, factory: (require) => { ...; return module.exports } })
  * ```
  *
- * `id` 必须是**包名**（`dsh-session-archive`）—— 加载器按包名索引，
+ * `id` 必须是**包名**（取自 `package.json` 的 `name`）—— 加载器按包名索引，
  * 用条目 id 或文件路径会让模块永远解析不到。
  *
  * `react` / `react-dom` 保持 external：它们由宿主 shell 提供单例，
